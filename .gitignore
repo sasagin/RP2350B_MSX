@@ -1,0 +1,14 @@
+build/*
+.vscode/*
+Arhiv/*
+Emul/*
+Arhiv/*
+
+
+*.exe
+*.rom
+*.pio.h
+*.zip
+*.7z
+
+
