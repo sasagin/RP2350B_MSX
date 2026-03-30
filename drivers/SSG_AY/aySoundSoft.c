@@ -353,9 +353,9 @@ uint16_t get_AY_Out(uint8_t delta){
 		}
 	}
 // output channel	
-	outs[0]=chA_bitOut?((chip.ay_R8&0xf0)?chip.ampl_ENV:ampls0[chip.ay_R8]):0; //outA
-	outs[1]=chB_bitOut?((chip.ay_R9&0xf0)?chip.ampl_ENV:ampls0[chip.ay_R9]):0; //outB
-	outs[2]=chC_bitOut?((chip.ay_R10&0xf0)?chip.ampl_ENV:ampls0[chip.ay_R10]):0; //outC
+	outs[0]=chA_bitOut?((chip.ay_R8&0xE0)?chip.ampl_ENV:ampls0[chip.ay_R8<<1]):0; //outA
+	outs[1]=chB_bitOut?((chip.ay_R9&0xE0)?chip.ampl_ENV:ampls0[chip.ay_R9<<1]):0; //outB
+	outs[2]=chC_bitOut?((chip.ay_R10&0xE0)?chip.ampl_ENV:ampls0[chip.ay_R10<<1]):0; //outC
 
 	return outs[0] + outs[1] + outs[2];	
 };

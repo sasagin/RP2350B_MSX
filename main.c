@@ -6,6 +6,7 @@
 #include "hardware/pwm.h"
 // #include "hardware/i2c.h"
 #include "hardware/timer.h"
+#include "hardware/dma.h"
 
 #include "hardware/vreg.h"
 #include <hardware/structs/qmi.h>
@@ -94,7 +95,11 @@
 #define SEC_SLOT3   3
 
  // Secondary Slot Register
-#define SSR     0xFFFF 
+#define SSR     0xFFFF
+
+
+// звук
+uint16_t sample_to_send = 0; 
 
 uint8_t __aligned(4) bios_rom[0x8000];
 uint8_t __aligned(4) cart_rom[2][0x4000];
@@ -243,7 +248,7 @@ void Z80_pin_setup() {
     // outInit(INT_PIN, 1);
     outInit(VDP_RD,1);
     outInit(VDP_WR,1);
-    outInit(AUD_W,1);
+    // outInit(AUD_W,1);
     outInit(PIN_NES_JOYPAD_CLOCK,1);
     outInit(PIN_NES_JOYPAD_LATCH,1);
 }
@@ -304,12 +309,6 @@ __always_inline static inline uint8_t read8255(const uint8_t reg)
     
     }
 
-
-// // read data from PSG  
-// __always_inline static inline uint8_t readSSG(){
-//     return AY_get_reg();
-// } 
-
 // Z80 write-side address decode: ioport,.
 __always_inline static inline void write_MSX_io(const uint8_t portIO, const uint8_t value) {
 
@@ -319,7 +318,7 @@ __always_inline static inline void write_MSX_io(const uint8_t portIO, const uint
             break;
 // write to PSG                                 
         case SSG:                                     
-            gpio_put(AUD_W,0);                          // CS PSG
+            // gpio_put(AUD_W,0);                          // CS PSG
             if(portIO == 0xA0){
             AY_select_reg(value);
             }          
@@ -344,7 +343,7 @@ __always_inline static inline void read_MSX_io(const uint8_t portIO) {
             break;          
         case SSG:
             {
-                gpio_put(AUD_W,0);                          // CS PSG
+                // gpio_put(AUD_W,0);                          // CS PSG
                 uint8_t temp = 0xFF;                
                 if(portIO == 0xA2){temp = AY_get_reg();start_read_joypad = true;}    
                 const uint32_t data = ((uint32_t)temp) << 22 ; 
@@ -554,7 +553,7 @@ void __time_critical_func(Z80_loop)() {
         }
         gpio_put(VDP_WR,1);
         gpio_put(VDP_RD,1);
-        gpio_put(AUD_W,1);
+        // gpio_put(AUD_W,1);
     }
 }
 
@@ -563,6 +562,16 @@ void print_key_state() {
         if (pressed_keys[i]) translate_keys_to_MSX(keymapMSX,pressed_keys[i]); //printf("%02X ", pressed_keys[i]); 
     }
 }
+
+// Обработчик прерывания таймера
+bool alarm_callback(struct repeating_timer *t) {
+        sample_to_send =  get_AY_Out(4) << 3;
+        // uint16_t raw_data = get_AY_Out(4) << 8; // Ваш источник
+        // sample_to_send = (uint16_t)(((uint32_t)raw_data * (top + 1)) >> 16);
+    return true; // Продолжаем повторение
+}
+
+
 
 // main------------------------------------------
 
@@ -600,10 +609,60 @@ void print_key_state() {
 
     VDP_INT_init();
 
-    // init PSG
+    // init PSG 
 
-    // init keyboard
+    // Создаём повторяющийся таймер
+    struct repeating_timer timer;
+    // Период в микросекундах: 1 000 000 / 58 000 ≈ 17,24 мкс
+    int64_t period_us = 1000000LL / 55000;
+    // Запускаем таймер с заданным периодом
+    if (!add_repeating_timer_us(-period_us, alarm_callback, NULL, &timer)) {
+        printf("Failed to start timer\n");
+        return -1;
+    }
 
+
+    const uint PWM_PIN = AUD_W;
+    const float SYS_CLK = 315000000.0f;
+    const float PWM_FREQ = 44100.0f;
+    // const uint SAMPLE_FREQ = 33000;
+
+    // 1. Настройка PWM (44 кГц)
+    gpio_set_function(PWM_PIN, GPIO_FUNC_PWM);
+    uint slice = pwm_gpio_to_slice_num(PWM_PIN);
+    uint chan = pwm_gpio_to_channel(PWM_PIN);
+    uint32_t top = (uint32_t)(SYS_CLK / PWM_FREQ) - 1;
+    pwm_set_wrap(slice, top);
+    pwm_set_enabled(slice, true);
+
+    // Адрес регистра для записи уровня ШИМ (CC - Compare Counter)
+    volatile void* pwm_cc_reg = (void*)&pwm_hw->slice[slice].cc;
+
+    // 2. Настройка DMA
+    int dma_chan = dma_claim_unused_channel(true);
+    dma_channel_config c = dma_channel_get_default_config(dma_chan);
+    
+    channel_config_set_transfer_data_size(&c, DMA_SIZE_16); // 16 бит
+    channel_config_set_read_increment(&c, false);          // Читаем из одного места
+    channel_config_set_write_increment(&c, false);         // Пишем в один регистр
+    
+    // Синхронизация по таймеру (DREQ_TIMER0)
+    int timer_dreq = dma_get_timer_dreq(0); 
+    channel_config_set_dreq(&c, timer_dreq);
+
+    // Настраиваем таймер на 33 кГц (315МГц / 10000 = 31.5кГц)
+    // Либо используем встроенный механизм dma_timer:
+    dma_timer_set_fraction(0, 1, 10000); // Настройка делителя таймера 0
+
+    dma_channel_configure(
+        dma_chan,
+        &c,
+        pwm_cc_reg,        // Куда (PWM CC register)
+        &sample_to_send,   // Откуда (Ваша переменная)
+        0xFFFFFFFF,        // Сколько раз (бесконечно в режиме зацикливания)
+        true               // Старт
+    ); 
+    
     // Load BIOS
     memcpy(bios_rom, msx_rom, msx_rom_len); 
     // memcpy(bios_rom, cbios_rom, cbios_rom_len);
@@ -618,10 +677,10 @@ void print_key_state() {
     // memcpy(cart_rom[1], Rock_rom, Rock_rom_len);
     // memcpy(cart_rom[1], BattleShip_rom, BattleShip_rom_len);
     // 32 kb
-      memcpy(cart_rom[0], Castle_rom, 0x4000);
-      memcpy(cart_rom[1], Castle_rom + 0x4000, 0x4000); 
-    //   memcpy(cart_rom[0], Yazzie_rom, 0x4000);
-    //   memcpy(cart_rom[1], Yazzie_rom + 0x4000, 0x4000);    
+    //   memcpy(cart_rom[0], Castle_rom, 0x4000);
+    //   memcpy(cart_rom[1], Castle_rom + 0x4000, 0x4000); 
+      memcpy(cart_rom[0], Yazzie_rom, 0x4000);
+      memcpy(cart_rom[1], Yazzie_rom + 0x4000, 0x4000);    
     //   memcpy(cart_rom[0], BoulderDash_rom, 0x4000);
     //   memcpy(cart_rom[1], BoulderDash_rom + 0x4000, 0x4000); 
     //   memcpy(cart_rom[0], MSXDiag_rom, 0x4000);
@@ -639,6 +698,7 @@ void print_key_state() {
     AY_reset();    
 
 int timer_ms =us_to_ms(time_us_32());
+int timer_us = time_us_32();
 
 
     while (true) {
@@ -647,10 +707,7 @@ int timer_ms =us_to_ms(time_us_32());
             busy_wait_us(300);           
             convert_nes_to_MSX_joypad(read_joystick_data());
             set_joy_val(msx_joysticks[0],msx_joysticks[1]);
-
             start_read_joypad = false;
-            // timer_ms =us_to_ms(time_us_32());
-            // printf(" joy1 = %02X   joy2 = %02X      \n ", reg_1, reg_2); 
         } 
 
         if(start_read_keyboard){
@@ -658,9 +715,7 @@ int timer_ms =us_to_ms(time_us_32());
         // busy_wait_us(500);    
         tuh_task(); // Обслуживание USB стека           
         }
-        busy_wait_us(100);
-        printf ("sound value = %04X\n",get_AY_Out(3));
-
+     
     }//while
 }//main
 
