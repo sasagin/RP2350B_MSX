@@ -320,17 +320,17 @@ uint16_t get_AY_Out(uint8_t delta){
 				case (0b0010):
 				case (0b0011):
 				case (0b1001):
-				if (chip.envelope_ay_count<16) chip.ampl_ENV=ampls0[31-env_count_32]; else {chip.ampl_ENV=ampls0[0];};
+				if (chip.envelope_ay_count<31) chip.ampl_ENV=ampls0[31-env_count_32]; else {chip.ampl_ENV=ampls0[0];};
 				break;
 				case (0b0100):
 				case (0b0101):
 				case (0b0110):
 				case (0b0111):
 				case (0b1111):
-				if (chip.envelope_ay_count<16) chip.ampl_ENV=ampls0[env_count_32]; else {chip.ampl_ENV=ampls0[0];}
+				if (chip.envelope_ay_count<31) chip.ampl_ENV=ampls0[env_count_32]; else {chip.ampl_ENV=ampls0[0];}
 				break;
 				case (0b1000):
-				chip.ampl_ENV=ampls0[15-env_count_32]; 
+				chip.ampl_ENV=ampls0[31-env_count_32]; 
 				break;
 				case (0b1100):
 				chip.ampl_ENV=ampls0[env_count_32]; 
@@ -353,9 +353,9 @@ uint16_t get_AY_Out(uint8_t delta){
 		}
 	}
 // output channel	
-	outs[0]=chA_bitOut?((chip.ay_R8&0xE0)?chip.ampl_ENV:ampls0[chip.ay_R8<<1]):0; //outA
-	outs[1]=chB_bitOut?((chip.ay_R9&0xE0)?chip.ampl_ENV:ampls0[chip.ay_R9<<1]):0; //outB
-	outs[2]=chC_bitOut?((chip.ay_R10&0xE0)?chip.ampl_ENV:ampls0[chip.ay_R10<<1]):0; //outC
+	outs[0]=chA_bitOut?((chip.ay_R8&0xF0)?chip.ampl_ENV:ampls0[chip.ay_R8<<1]):0; //outA
+	outs[1]=chB_bitOut?((chip.ay_R9&0xF0)?chip.ampl_ENV:ampls0[chip.ay_R9<<1]):0; //outB
+	outs[2]=chC_bitOut?((chip.ay_R10&0xF0)?chip.ampl_ENV:ampls0[chip.ay_R10<<1]):0; //outC
 
 	return outs[0] + outs[1] + outs[2];	
 };
