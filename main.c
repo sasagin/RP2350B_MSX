@@ -18,8 +18,9 @@
 
 #include "MSX_keycode.h"
 
-// #include "BIOS/MSXBASIC.h"
-#include "BIOS/cbios.h"
+#include "BIOS/pico9918_asc16.h"
+#include "BIOS/pico9918_konami.h"
+// #include "BIOS/cbios.h"
 // #include "BIOS/cbios_msx1.h"
 #include "BIOS/msx.h"
 #include "BIOS/yamaha_msx1_diag.h"
@@ -35,6 +36,21 @@
 #include "BIOS/Choplifter.h"
 #include "BIOS/Castle.h"
 #include "BIOS/Flappy.h"
+#include "BIOS/Saimazoom.h"
+#include "BIOS/PSG.h"
+#include "BIOS/Syntesizer.h"
+#include "BIOS/Formula.h"
+#include "BIOS/Nemesis.h"
+#include "BIOS/Arkanoid.h"
+#include "BIOS/BlockHole.h"
+#include "BIOS/Skooter.h"
+#include "BIOS/GrandPrixRider.h"
+#include "BIOS/Soukoban.h"
+#include "BIOS/Thexder.h"
+#include "BIOS/RoadFighter.h"
+#include "BIOS/A1Spirit.h"
+#include "BIOS/Hang-On.h"
+
 
 #include "Z80pinout.h"
 #include "VDP_int_Z80.pio.h"
@@ -102,18 +118,24 @@
 uint16_t sample_to_send = 0; 
 
 uint8_t __aligned(4) bios_rom[0x8000];
-uint8_t __aligned(4) cart_rom[2][0x4000];
+uint8_t __aligned(4) cart_rom[16][0x2000];
 uint8_t __aligned(4) page_ram[0x10000];
 
 // Memory Mapper Register PAGE0 = FCh,  PAGE1 = FD, PAGE2 = FE, PAGE3 = FF
-uint8_t page0 = 3;                      
-uint8_t page1 = 2;
-uint8_t page2 = 1;
-uint8_t page3 = 0;
+// uint8_t page0 = 3;                      
+// uint8_t page1 = 2;
+// uint8_t page2 = 1;
+// uint8_t page3 = 0;
 // Primary Slot Register
 uint8_t pri_slot_reg[4] = {0,0,0,0};
 // Secondary Slot Register
 uint8_t sec_slot_reg = 0;
+//cartrige bank
+uint8_t cart_page0 = 0;
+uint8_t cart_page1 = 1;
+uint8_t cart_page2 = 2;
+uint8_t cart_page3 = 3;
+uint8_t cart_page4 = 4;
 
 // PPI
 uint8_t portA_8255 = 0;                         // port 0xA8        primary slot register
@@ -122,9 +144,10 @@ uint8_t portC_8255 = 0;                         // port 0xAA        output polli
 uint8_t mode_8255;                              // port 0xAB        mode 8255
 
 //regs for tests
+volatile bool start_print_regs = true;
 volatile uint8_t reg_1 = 0x00; //
-volatile uint8_t reg_2 = 0x00; //
-volatile uint8_t reg_3 = 0x00; //
+volatile uint16_t reg_2 = 0x00; //
+// volatile uint8_t reg_3 = 0x00; //
 // volatile uint8_t reg_4 = 0x00; //
 // volatile uint8_t reg_5 = 0x00; //
 // volatile uint8_t reg_6 = 0x00; //
@@ -385,6 +408,7 @@ __always_inline static inline uint8_t read_MSX_memory(const uint16_t address) {
                             case SLOT0:
                                 return bios_rom[address];
                                 break;
+                                                                
                             case SLOT3:
                                 return page_ram[address];
                                 break;                                                    
@@ -401,8 +425,9 @@ __always_inline static inline uint8_t read_MSX_memory(const uint16_t address) {
                             case SLOT0:
                                 return bios_rom[address];
                                 break;
-                            case SLOT1:
-                                return cart_rom[0][address & 0x3fff];
+                            case SLOT2:
+                                if((address & 0x2000)==0){return cart_rom[cart_page0][address & 0x1fff];}else{
+                                    return cart_rom[cart_page1][address & 0x1fff];}
                                 break;                                
                             case SLOT3:
                                 return page_ram[address];
@@ -417,8 +442,9 @@ __always_inline static inline uint8_t read_MSX_memory(const uint16_t address) {
                     {
                         switch (pri_slot_reg[2])
                             {
-                            case SLOT1:
-                                return cart_rom[1][address & 0x3fff];
+                            case SLOT2:
+                                if((address & 0x2000)==0){return cart_rom[cart_page2][address & 0x1fff];}else{
+                                    return cart_rom[cart_page3][address & 0x1fff];}
                                 break;                                        
                             case SLOT3:
                                 return page_ram[address];
@@ -431,7 +457,8 @@ __always_inline static inline uint8_t read_MSX_memory(const uint16_t address) {
                 case CS3:                                               //page_3 0xC000 - 0xFFFF                       
                     {                       
                         switch (pri_slot_reg[3])
-                            {       
+                            { 
+                                                                       
                             case SLOT3:
                                 return page_ram[address];
                                 break;                                                                                                       
@@ -457,9 +484,9 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
 
         switch (ad)
         {
-            case CS0:                                                   //page_3 0xC000 - 0xFFFF          
+            case CS0:                                                   //page_0 0x0000 - 0x3FFF          
                 {
-                 switch (pri_slot_reg[0])                      //primary slot 3
+                 switch (pri_slot_reg[0])                      
                         {                                                   
                         case SLOT3:
                             page_ram[address] = value;                           
@@ -469,10 +496,26 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
                         }  
                 }
                 break;            
-            case CS1:                                                   //page_3 0xC000 - 0xFFFF          
+            case CS1:                                                   //page_1 0x4000 - 0x7FFF          
                 {
-                 switch (pri_slot_reg[1])                      //primary slot 3
-                        {                                                   
+                 switch (pri_slot_reg[1])                      
+                        {
+                        case SLOT2:
+                            
+//nemesis  ok!                      
+                                // if(address == 0x68FF){
+                                //     cart_page1 = value;
+                                // }
+                                // if(address == 0x70FF){
+                                //     cart_page2 = value;
+                                // }
+                                // if(address == 0x78ff){
+                                //     cart_page3 = value;
+                                // }
+
+                                if(address == 0x7000) {cart_page1 = value; }
+
+                            break;
                         case SLOT3:
                             page_ram[address] = value;                           
                             break;                                      
@@ -481,10 +524,16 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
                         }  
                 }
                 break;                
-            case CS2:                                                   //page_3 0xC000 - 0xFFFF          
+            case CS2:                                                   //page_2 0x8000 - 0xBFFF          
                 {
-                 switch (pri_slot_reg[2])                      //primary slot 3
-                        {                                                   
+                 switch (pri_slot_reg[2])                      
+                        {
+                        case SLOT2:
+// konami ---------------------------------------------------------------                       
+                            if(address == 0x9000) {cart_page2 = value; }
+                            if(address == 0xB000) {cart_page3 = value; } 
+//-----------------------------------------------------------------------                                                   
+                            break;                                                       
                         case SLOT3:
                             page_ram[address] = value;                           
                             break;                                      
@@ -495,7 +544,7 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
                 break;                    
             case CS3:                                                   //page_3 0xC000 - 0xFFFF          
                 {
-                 switch (pri_slot_reg[3])                      //primary slot 3
+                 switch (pri_slot_reg[3])                      
                         {                                                   
                         case SLOT3:
                             page_ram[address] = value;                           
@@ -672,21 +721,35 @@ bool alarm_callback(struct repeating_timer *t) {
     // memcpy(cart_rom[0], yamaha_msx1_diag_rom, yamaha_msx1_diag_rom_len);
     // memcpy(cart_rom[0], Oil_rom, Oil_rom_len);
     // memcpy(cart_rom[0], Flappy_rom, Flappy_rom_len);
+    // memcpy(cart_rom[0], PSG_rom, PSG_rom_len);
     // memcpy(cart_rom[1], Psych_rom, Psych_rom_len);
     // memcpy(cart_rom[1], BombMan_rom, BombMan_rom_len);
     // memcpy(cart_rom[1], Rock_rom, Rock_rom_len);
     // memcpy(cart_rom[1], BattleShip_rom, BattleShip_rom_len);
+    // memcpy(cart_rom[1], Viking_rom, Viking_rom_len);
     // 32 kb
     //   memcpy(cart_rom[0], Castle_rom, 0x4000);
     //   memcpy(cart_rom[1], Castle_rom + 0x4000, 0x4000); 
-      memcpy(cart_rom[0], Yazzie_rom, 0x4000);
-      memcpy(cart_rom[1], Yazzie_rom + 0x4000, 0x4000);    
+    //   memcpy(cart_rom[0], Yazzie_rom, 0x4000);
+    //   memcpy(cart_rom[1], Yazzie_rom + 0x4000, 0x4000);    
     //   memcpy(cart_rom[0], BoulderDash_rom, 0x4000);
     //   memcpy(cart_rom[1], BoulderDash_rom + 0x4000, 0x4000); 
-    //   memcpy(cart_rom[0], MSXDiag_rom, 0x4000);
-    //   memcpy(cart_rom[1], MSXDiag_rom + 0x4000, 0x4000);
+    //   memcpy(cart_rom[cart_page0], MSXDiag_rom, 0x4000);
+    //   memcpy(cart_rom[cart_page1], MSXDiag_rom + 0x4000, 0x4000);
     //   memcpy(cart_rom[0], Choplifter_rom, 0x4000);
-    //   memcpy(cart_rom[1], Choplifter_rom + 0x4000, 0x4000);    
+    //   memcpy(cart_rom[1], Choplifter_rom + 0x4000, 0x4000);
+    //   memcpy(cart_rom[0], Saimazoom_rom, 0x4000);
+    //   memcpy(cart_rom[1], Saimazoom_rom + 0x4000, 0x4000);
+    //   memcpy(cart_rom[0], Synthesizer_rom, 0x4000);
+    //   memcpy(cart_rom[1], Synthesizer_rom + 0x4000, 0x4000);
+    
+    //ASCII/16kB
+    // 128 kB 
+    for (size_t i = 0; i < A1Spirit_rom_len/0x2000; i++)
+    {
+        memcpy(cart_rom[i], A1Spirit_rom +i*0x2000,0x2000);
+    }
+
 
 // sleep_ms(2000);
 
@@ -696,10 +759,6 @@ bool alarm_callback(struct repeating_timer *t) {
     gpio_put(RESET_PIN,0);    busy_wait_ms(200);    
     gpio_put(RESET_PIN,1); 
     AY_reset();    
-
-int timer_ms =us_to_ms(time_us_32());
-int timer_us = time_us_32();
-
 
     while (true) {
 
@@ -715,7 +774,12 @@ int timer_us = time_us_32();
         // busy_wait_us(500);    
         tuh_task(); // Обслуживание USB стека           
         }
-     
+
+        if(start_print_regs){
+            start_print_regs = false;
+            printf ("page = %02X      Address = %04X  \n",reg_1, reg_2);
+
+        }
     }//while
 }//main
 
