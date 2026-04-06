@@ -512,9 +512,9 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
                                 // if(address == 0x78ff){
                                 //     cart_page3 = value;
                                 // }
-
+// konami ---------------------------------------------------------------
                                 if(address == 0x7000) {cart_page1 = value; }
-
+//--------------------------------------------------------------------------
                             break;
                         case SLOT3:
                             page_ram[address] = value;                           
