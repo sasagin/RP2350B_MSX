@@ -49,8 +49,7 @@
 #include "BIOS/Thexder.h"
 #include "BIOS/RoadFighter.h"
 #include "BIOS/A1Spirit.h"
-#include "BIOS/Hang-On.h"
-
+#include "BIOS/suitemsx.h"
 
 #include "Z80pinout.h"
 #include "VDP_int_Z80.pio.h"
@@ -316,7 +315,7 @@ __always_inline static inline uint8_t read8255(const uint8_t reg)
                 return portA_8255; 
                 break;
             case 1:
-                start_read_keyboard = true;
+                // start_read_keyboard = true;
                 return keymapMSX[portC_8255 & 0x0f]; 
                 break;
             case 2:
@@ -368,7 +367,10 @@ __always_inline static inline void read_MSX_io(const uint8_t portIO) {
             {
                 // gpio_put(AUD_W,0);                          // CS PSG
                 uint8_t temp = 0xFF;                
-                if(portIO == 0xA2){temp = AY_get_reg();start_read_joypad = true;}    
+                if(portIO == 0xA2){
+                    temp = AY_get_reg();
+                    //  start_read_joypad = true;
+                    }    
                 const uint32_t data = ((uint32_t)temp) << 22 ; 
                 gpio_put_masked(DATA_MASK,data);           
                 gpio_set_dir_out_masked(DATA_MASK);                
@@ -501,7 +503,10 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
                  switch (pri_slot_reg[1])                      
                         {
                         case SLOT2:
-                            
+                            reg_2 = address;
+                            reg_1 = value;
+                            start_print_regs = true;
+                            if(address == 0x7000) {cart_page1 = value&0x0F;}
 //nemesis  ok!                      
                                 // if(address == 0x68FF){
                                 //     cart_page1 = value;
@@ -512,9 +517,6 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
                                 // if(address == 0x78ff){
                                 //     cart_page3 = value;
                                 // }
-// konami ---------------------------------------------------------------
-                                if(address == 0x7000) {cart_page1 = value; }
-//--------------------------------------------------------------------------
                             break;
                         case SLOT3:
                             page_ram[address] = value;                           
@@ -529,11 +531,11 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
                  switch (pri_slot_reg[2])                      
                         {
                         case SLOT2:
-// konami ---------------------------------------------------------------                       
-                            if(address == 0x9000) {cart_page2 = value; }
-                            if(address == 0xB000) {cart_page3 = value; } 
-//-----------------------------------------------------------------------                                                   
-                            break;                                                       
+                            reg_2 = address;
+                            reg_1 = value;
+                            start_print_regs = true;                        
+                            // if(address == 0x9000) {cart_page2 = value&0x6;}
+                            if(address == 0xB000) {cart_page3 = value&0x0F;}                                                                                                           
                         case SLOT3:
                             page_ram[address] = value;                           
                             break;                                      
@@ -620,6 +622,13 @@ bool alarm_callback(struct repeating_timer *t) {
     return true; // Продолжаем повторение
 }
 
+// Обработчик таймера 8ms
+bool my_timer_callback(struct repeating_timer *t) {
+                start_read_keyboard = true;
+                start_read_joypad = true; 
+    return true; // продолжаем повторение
+}
+
 
 
 // main------------------------------------------
@@ -662,10 +671,20 @@ bool alarm_callback(struct repeating_timer *t) {
 
     // Создаём повторяющийся таймер
     struct repeating_timer timer;
+	
+	struct repeating_timer timer_8ms;
+	
+	
     // Период в микросекундах: 1 000 000 / 58 000 ≈ 17,24 мкс
     int64_t period_us = 1000000LL / 55000;
     // Запускаем таймер с заданным периодом
     if (!add_repeating_timer_us(-period_us, alarm_callback, NULL, &timer)) {
+        printf("Failed to start timer\n");
+        return -1;
+    }
+	
+	    // Запускаем таймер: интервал 8 мс, немедленный старт
+    if (!add_repeating_timer_ms(-8, my_timer_callback, NULL, &timer_8ms)) {
         printf("Failed to start timer\n");
         return -1;
     }
@@ -745,9 +764,9 @@ bool alarm_callback(struct repeating_timer *t) {
     
     //ASCII/16kB
     // 128 kB 
-    for (size_t i = 0; i < A1Spirit_rom_len/0x2000; i++)
+    for (size_t i = 0; i < suitemsx_rom_len/0x2000; i++)
     {
-        memcpy(cart_rom[i], A1Spirit_rom +i*0x2000,0x2000);
+        memcpy(cart_rom[i], suitemsx_rom +i*0x2000,0x2000);
     }
 
 
@@ -763,7 +782,7 @@ bool alarm_callback(struct repeating_timer *t) {
     while (true) {
 
         if(start_read_joypad){ 
-            busy_wait_us(300);           
+            // busy_wait_us(300);           
             convert_nes_to_MSX_joypad(read_joystick_data());
             set_joy_val(msx_joysticks[0],msx_joysticks[1]);
             start_read_joypad = false;
@@ -775,9 +794,19 @@ bool alarm_callback(struct repeating_timer *t) {
         tuh_task(); // Обслуживание USB стека           
         }
 
+        // busy_wait_ms(8);
+        //         start_read_keyboard = true;
+        //         start_read_joypad = true;           
+
         if(start_print_regs){
             start_print_regs = false;
             printf ("page = %02X      Address = %04X  \n",reg_1, reg_2);
+            //     uint16_t start_address = 0xF0F1;
+            // for (size_t i = 0; i < 3; i++)
+            // {
+            //     printf ("page = %02X      Address = %04X  \n",start_address+i, page_ram[start_address+i]);
+            // }
+            
 
         }
     }//while
