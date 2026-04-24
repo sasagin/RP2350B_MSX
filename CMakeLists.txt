@@ -46,7 +46,10 @@ add_executable(${PROJECT_NAME} main.c)
 pico_set_program_name(RP2350_MSX "RP2350Tester")
 pico_set_program_version(RP2350_MSX "0.1")
 
-add_subdirectory(drivers/SSG_AY)
+add_subdirectory(
+                    drivers/SSG_AY
+                    drivers/SCC
+    )
 
 # Add the standard library to the build
 target_link_libraries(${PROJECT_NAME} PRIVATE
@@ -75,9 +78,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PRIVATE
 
         aySoundSoft
+        SCC
      
         pico_runtime
-        pico_stdlib
+        
         hardware_vreg
         hardware_clocks
         hardware_pwm

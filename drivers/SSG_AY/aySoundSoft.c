@@ -320,14 +320,14 @@ uint16_t get_AY_Out(uint8_t delta){
 				case (0b0010):
 				case (0b0011):
 				case (0b1001):
-				if (chip.envelope_ay_count<31) chip.ampl_ENV=ampls0[31-env_count_32]; else {chip.ampl_ENV=ampls0[0];};
+				if (chip.envelope_ay_count<32) chip.ampl_ENV=ampls0[31-env_count_32]; else {chip.ampl_ENV=ampls0[0];};
 				break;
 				case (0b0100):
 				case (0b0101):
 				case (0b0110):
 				case (0b0111):
 				case (0b1111):
-				if (chip.envelope_ay_count<31) chip.ampl_ENV=ampls0[env_count_32]; else {chip.ampl_ENV=ampls0[0];}
+				if (chip.envelope_ay_count<32) chip.ampl_ENV=ampls0[env_count_32]; else {chip.ampl_ENV=ampls0[0];}
 				break;
 				case (0b1000):
 				chip.ampl_ENV=ampls0[31-env_count_32]; 

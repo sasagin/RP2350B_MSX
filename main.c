@@ -13,10 +13,15 @@
 #include <hardware/structs/xip.h>
 
 #include "drivers/SSG_AY/aySoundSoft.h"
+#include "drivers/SCC/SCC.h"
+
 #include "tusb_config.h"
 #include "tusb.h"
 
 #include "MSX_keycode.h"
+
+#include "Z80pinout.h"
+#include "VDP_int_Z80.pio.h"
 
 #include "BIOS/pico9918_asc16.h"
 #include "BIOS/pico9918_konami.h"
@@ -50,9 +55,8 @@
 #include "BIOS/RoadFighter.h"
 #include "BIOS/A1Spirit.h"
 #include "BIOS/suitemsx.h"
-
-#include "Z80pinout.h"
-#include "VDP_int_Z80.pio.h"
+#include "BIOS/Gradius2.h"
+// #include "BIOS/SCCBOOT.h"
 
 #define UART_ID uart0
 #define BAUD_RATE 115200
@@ -112,13 +116,15 @@
  // Secondary Slot Register
 #define SSR     0xFFFF
 
-
-// звук
-uint16_t sample_to_send = 0; 
-
 uint8_t __aligned(4) bios_rom[0x8000];
 uint8_t __aligned(4) cart_rom[16][0x2000];
 uint8_t __aligned(4) page_ram[0x10000];
+
+// звук
+uint8_t SCC_ram[0x80] = {0};
+bool SCC_on = 0;
+// max value 0x1B00
+uint16_t sample_to_send = 0; 
 
 // Memory Mapper Register PAGE0 = FCh,  PAGE1 = FD, PAGE2 = FE, PAGE3 = FF
 // uint8_t page0 = 3;                      
@@ -146,8 +152,8 @@ uint8_t mode_8255;                              // port 0xAB        mode 8255
 volatile bool start_print_regs = true;
 volatile uint8_t reg_1 = 0x00; //
 volatile uint16_t reg_2 = 0x00; //
-// volatile uint8_t reg_3 = 0x00; //
-// volatile uint8_t reg_4 = 0x00; //
+// volatile uint16_t reg_3 = 0x00; //
+// volatile uint16_t reg_4 = 0x00; //
 // volatile uint8_t reg_5 = 0x00; //
 // volatile uint8_t reg_6 = 0x00; //
 // volatile uint8_t reg_7 = 0x00; //
@@ -447,6 +453,7 @@ __always_inline static inline uint8_t read_MSX_memory(const uint16_t address) {
                             case SLOT2:
                                 if((address & 0x2000)==0){return cart_rom[cart_page2][address & 0x1fff];}else{
                                     return cart_rom[cart_page3][address & 0x1fff];}
+                                if(SCC_on && ((address & 0xFF80) == 0x9800)){ return SCC_ram[address & 0x07F];}        
                                 break;                                        
                             case SLOT3:
                                 return page_ram[address];
@@ -503,20 +510,20 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
                  switch (pri_slot_reg[1])                      
                         {
                         case SLOT2:
-                            reg_2 = address;
-                            reg_1 = value;
-                            start_print_regs = true;
+                            // reg_2 = address;
+                            // reg_1 = value;
+                            // start_print_regs = true;
                             if(address == 0x7000) {cart_page1 = value&0x0F;}
 //nemesis  ok!                      
-                                // if(address == 0x68FF){
-                                //     cart_page1 = value;
-                                // }
-                                // if(address == 0x70FF){
-                                //     cart_page2 = value;
-                                // }
-                                // if(address == 0x78ff){
-                                //     cart_page3 = value;
-                                // }
+                                if(address == 0x68FF){
+                                    cart_page1 = value;
+                                }
+                                if(address == 0x70FF){
+                                    cart_page2 = value;
+                                }
+                                if(address == 0x78ff){
+                                    cart_page3 = value;
+                                }
                             break;
                         case SLOT3:
                             page_ram[address] = value;                           
@@ -533,9 +540,18 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
                         case SLOT2:
                             reg_2 = address;
                             reg_1 = value;
-                            start_print_regs = true;                        
-                            // if(address == 0x9000) {cart_page2 = value&0x6;}
-                            if(address == 0xB000) {cart_page3 = value&0x0F;}                                                                                                           
+                            // start_print_regs = true;                        
+                            if(address == 0x9000) {
+                                if(value >= 0x20){SCC_on = 1;}else{cart_page2 = value & 0x0F;}                               
+                            }
+                            if(address == 0xB000) {cart_page3 = value&0x0F;}
+                            
+                            if((address & 0xFF80) == 0x9800){
+                                 SCC_ram[address & 0x07F] = value;
+                                }else if((address & 0xFF80) == 0x9880){
+                                    set_SCC_reg(address , value);
+// start_print_regs = true;                                     
+                                }
                         case SLOT3:
                             page_ram[address] = value;                           
                             break;                                      
@@ -614,11 +630,15 @@ void print_key_state() {
     }
 }
 
+
 // Обработчик прерывания таймера
 bool alarm_callback(struct repeating_timer *t) {
-        sample_to_send =  get_AY_Out(4) << 3;
-        // uint16_t raw_data = get_AY_Out(4) << 8; // Ваш источник
-        // sample_to_send = (uint16_t)(((uint32_t)raw_data * (top + 1)) >> 16);
+        uint16_t SCC_out = 0;
+        if(SCC_on){SCC_out = get_SCC_Out();}
+
+        sample_to_send = SCC_out ;
+        sample_to_send += (get_AY_Out(1)<<3) - 512;
+
     return true; // Продолжаем повторение
 }
 
@@ -676,7 +696,7 @@ bool my_timer_callback(struct repeating_timer *t) {
 	
 	
     // Период в микросекундах: 1 000 000 / 58 000 ≈ 17,24 мкс
-    int64_t period_us = 1000000LL / 55000;
+    int64_t period_us = 1000000LL / 110000;
     // Запускаем таймер с заданным периодом
     if (!add_repeating_timer_us(-period_us, alarm_callback, NULL, &timer)) {
         printf("Failed to start timer\n");
@@ -761,12 +781,13 @@ bool my_timer_callback(struct repeating_timer *t) {
     //   memcpy(cart_rom[1], Saimazoom_rom + 0x4000, 0x4000);
     //   memcpy(cart_rom[0], Synthesizer_rom, 0x4000);
     //   memcpy(cart_rom[1], Synthesizer_rom + 0x4000, 0x4000);
+
     
     //ASCII/16kB
     // 128 kB 
-    for (size_t i = 0; i < suitemsx_rom_len/0x2000; i++)
+    for (size_t i = 0; i < Gradius2_rom_len/0x2000; i++)
     {
-        memcpy(cart_rom[i], suitemsx_rom +i*0x2000,0x2000);
+        memcpy(cart_rom[i], Gradius2_rom +i*0x2000,0x2000);
     }
 
 
