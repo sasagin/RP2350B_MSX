@@ -1,4 +1,9 @@
-add_library(SCC INTERFACE)
-target_link_libraries(SCC INTERFACE pico_stdlib )
-target_sources(SCC INTERFACE ${CMAKE_CURRENT_LIST_DIR}/SCC.c)
-target_include_directories(SCC INTERFACE ${CMAKE_CURRENT_LIST_DIR})
+# Убираем INTERFACE, делаем обычную статическую библиотеку
+add_library(SCC STATIC) 
+
+# Для обычной библиотеки используем PRIVATE или PUBLIC вместо INTERFACE
+target_sources(SCC PRIVATE ${CMAKE_CURRENT_LIST_DIR}/SCC.c)
+
+target_include_directories(SCC PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+
+target_link_libraries(SCC PRIVATE pico_stdlib)
