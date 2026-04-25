@@ -46,10 +46,8 @@ add_executable(${PROJECT_NAME} main.c)
 pico_set_program_name(RP2350_MSX "RP2350Tester")
 pico_set_program_version(RP2350_MSX "0.1")
 
-add_subdirectory(
-                    drivers/SSG_AY
-                    drivers/SCC
-    )
+add_subdirectory(drivers/SCC)
+add_subdirectory(drivers/SSG_AY)
 
 # Add the standard library to the build
 target_link_libraries(${PROJECT_NAME} PRIVATE
@@ -75,21 +73,23 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
 )  
 
+
 # Add any user requested libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE
 
-        aySoundSoft
-        SCC
-     
-        pico_runtime
+        aySoundSoft 
         
+        SCC
+
+        pico_runtime
+        hardware_dma       
         hardware_vreg
         hardware_clocks
         hardware_pwm
         hardware_pio
         # hardware_i2c
         pico_multicore
-        hardware_interp hardware_timer hardware_clocks hardware_pwm hardware_flash
+        hardware_interp hardware_timer hardware_flash
         )
 
 pico_add_extra_outputs(${PROJECT_NAME})

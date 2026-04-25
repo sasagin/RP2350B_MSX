@@ -1,9 +1,7 @@
 
 #include <stdio.h>
 #include "pico/stdlib.h"
-#include "stdbool.h"
-
-#include "string.h"
+#include "inttypes.h"
 
 #include "SCC.h"
 
@@ -17,23 +15,26 @@ typedef struct SCC_regs_t {
 static SCC_regs_t chip;
 static uint8_t inx_sample[5];
 
+
+
 // out SCC 
 uint16_t get_SCC_Out(){
+
     int16_t outSCC = 0;
     uint8_t j;
 // mixer  
 
-    for (size_t i = 0; i < 3; i++)
+    for (size_t i = 0; i < 4; i++)
     {
-        if((chip.SCC_counter[i]++) >= (chip.SCC_freq[i]>>5)){
+        if((chip.SCC_counter[i]++) >= (chip.SCC_freq[i]>>4)){
             chip.SCC_counter[i] = 0;
             inx_sample[i]++;          
         }
-        j = (i < 4)? i : 3; 
-        outSCC += SCC_ram[(0x20*(j)) + inx_sample[i]] * chip.SCC_volume[i] * ((chip.SCC_channels_enable>>i) & 1);
+        j = (i < 4)? i : 3; // 3 и 4 из одной таблицы читаются
+        outSCC += SCC_ram[(0x20*(j)) + (inx_sample[i]&0x1F)] * chip.SCC_volume[i] * ((chip.SCC_channels_enable>>i) & 1);
     }
-        outSCC = outSCC/2;
-        uint16_t out = ((uint16_t)(outSCC + 2000))&0x1B00;
+        outSCC = outSCC * 2;
+        uint16_t out = ((uint16_t)(outSCC) + 0x8000)>>3;
         return out ;
 }
 

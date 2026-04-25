@@ -122,6 +122,10 @@ uint8_t __aligned(4) page_ram[0x10000];
 
 // звук
 uint8_t SCC_ram[0x80] = {0};
+
+// uint8_t sin255[] = {0, 53, 104, 150, 189, 242, 253, 255 };
+
+
 bool SCC_on = 0;
 // max value 0x1B00
 uint16_t sample_to_send = 0; 
@@ -636,8 +640,8 @@ bool alarm_callback(struct repeating_timer *t) {
         uint16_t SCC_out = 0;
         if(SCC_on){SCC_out = get_SCC_Out();}
 
-        sample_to_send = SCC_out ;
-        sample_to_send += (get_AY_Out(1)<<3) - 512;
+        // sample_to_send = SCC_out ;
+        sample_to_send = SCC_out + (get_AY_Out(1)<<3) - 2000;
 
     return true; // Продолжаем повторение
 }
@@ -790,6 +794,33 @@ bool my_timer_callback(struct repeating_timer *t) {
         memcpy(cart_rom[i], Gradius2_rom +i*0x2000,0x2000);
     }
 
+// size_t inxsin = 0;
+
+//     //0   
+//     for (size_t j = 0; j < 8; j++)
+//     {
+//         SCC_ram[inxsin*8 + j] = 128 + (sin255[j]/2);
+//     }
+//      //1
+//     inxsin++;    
+//     for (size_t j = 0; j < 8; j++)
+//     {
+//         SCC_ram[inxsin*8 + j] = 128 + (sin255[8-j]/2);
+//     }
+//      //2
+//     inxsin++;    
+//     for (size_t j = 0; j < 8; j++)
+//     {
+//         SCC_ram[inxsin*8 + j] = 128 - (sin255[j]/2);
+//     }
+//     inxsin++;    
+//      //3   
+//     for (size_t j = 0; j < 8; j++)
+//     {
+//         SCC_ram[inxsin*8 + j] = 128 - (sin255[8-j]/2);
+//     }     
+
+    
 
 // sleep_ms(2000);
 
