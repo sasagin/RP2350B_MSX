@@ -1,5 +1,5 @@
 #pragma once
-#include "inttypes.h"
+
 
 //SCC sound
 extern uint8_t SCC_ram[];

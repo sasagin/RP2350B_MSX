@@ -53,6 +53,7 @@ add_subdirectory(
 
 # Add the standard library to the build
 target_link_libraries(${PROJECT_NAME} PRIVATE
+            
             pico_stdlib
             tinyusb_host
             tinyusb_device         
