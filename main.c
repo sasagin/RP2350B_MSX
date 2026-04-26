@@ -127,8 +127,8 @@ uint8_t SCC_ram[0x80] = {0};
 
 
 bool SCC_on = 0;
-bool sound_start = 0;
-uint16_t sound_out;
+// bool sound_start = 0;
+// uint16_t sound_out;
 // max value 0x1B00
 uint16_t sample_to_send = 0; 
 
@@ -639,13 +639,13 @@ void print_key_state() {
 
 // Обработчик прерывания таймера
 bool alarm_callback(struct repeating_timer *t) {
-        sound_start = true;
+        // sound_start = true;
 
-        // uint16_t SCC_out = 0;
-        // if(SCC_on){SCC_out = get_SCC_Out();}
-        // sample_to_send = SCC_out + (get_AY_Out(1)<<3) - 2000;
+        uint16_t SCC_out = 2100;
+        if(SCC_on){SCC_out = get_SCC_Out();}
+        sample_to_send = SCC_out + (get_AY_Out(1)<<3) - 2000;
 
-        sample_to_send = sound_out;
+        // sample_to_send = sound_out;
 
     return true; // Продолжаем повторение
 }
@@ -797,34 +797,7 @@ bool my_timer_callback(struct repeating_timer *t) {
     {
         memcpy(cart_rom[i], Gradius2_rom +i*0x2000,0x2000);
     }
-
-// size_t inxsin = 0;
-
-//     //0   
-//     for (size_t j = 0; j < 8; j++)
-//     {
-//         SCC_ram[inxsin*8 + j] = 128 + (sin255[j]/2);
-//     }
-//      //1
-//     inxsin++;    
-//     for (size_t j = 0; j < 8; j++)
-//     {
-//         SCC_ram[inxsin*8 + j] = 128 + (sin255[8-j]/2);
-//     }
-//      //2
-//     inxsin++;    
-//     for (size_t j = 0; j < 8; j++)
-//     {
-//         SCC_ram[inxsin*8 + j] = 128 - (sin255[j]/2);
-//     }
-//     inxsin++;    
-//      //3   
-//     for (size_t j = 0; j < 8; j++)
-//     {
-//         SCC_ram[inxsin*8 + j] = 128 - (sin255[8-j]/2);
-//     }     
-
-    
+   
 
 // sleep_ms(2000);
 
@@ -837,12 +810,12 @@ bool my_timer_callback(struct repeating_timer *t) {
 
     while (true) {
 
-        if(sound_start){
-            uint16_t SCC_out = 2100;
-            if(SCC_on){SCC_out = get_SCC_Out();}
-            sound_out = SCC_out + (get_AY_Out(1)<<3) - 2000;
-            sound_start = 0;
-        }
+        // if(sound_start){
+        //     uint16_t SCC_out = 2100;
+        //     if(SCC_on){SCC_out = get_SCC_Out();}
+        //     sound_out = SCC_out + (get_AY_Out(1)<<3) - 2000;
+        //     sound_start = 0;
+        // }
 
         if(start_read_joypad){ 
             // busy_wait_us(300);           
@@ -857,14 +830,6 @@ bool my_timer_callback(struct repeating_timer *t) {
         tuh_task(); // Обслуживание USB стека           
         }
 
-        // busy_wait_ms(8);
-        //         start_read_keyboard = true;
-        //         start_read_joypad = true;           
-
-        // if(start_print_regs){
-        //     start_print_regs = false;
-        //     printf ("page = %02X      Address = %04X  \n",reg_1, reg_2);
-        // }
     }//while
 }//main
 
