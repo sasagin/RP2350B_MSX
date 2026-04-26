@@ -127,6 +127,8 @@ uint8_t SCC_ram[0x80] = {0};
 
 
 bool SCC_on = 0;
+bool sound_start = 0;
+uint16_t sound_out;
 // max value 0x1B00
 uint16_t sample_to_send = 0; 
 
@@ -637,11 +639,13 @@ void print_key_state() {
 
 // Обработчик прерывания таймера
 bool alarm_callback(struct repeating_timer *t) {
-        uint16_t SCC_out = 0;
-        if(SCC_on){SCC_out = get_SCC_Out();}
+        sound_start = true;
 
-        // sample_to_send = SCC_out ;
-        sample_to_send = SCC_out + (get_AY_Out(1)<<3) - 2000;
+        // uint16_t SCC_out = 0;
+        // if(SCC_on){SCC_out = get_SCC_Out();}
+        // sample_to_send = SCC_out + (get_AY_Out(1)<<3) - 2000;
+
+        sample_to_send = sound_out;
 
     return true; // Продолжаем повторение
 }
@@ -833,6 +837,13 @@ bool my_timer_callback(struct repeating_timer *t) {
 
     while (true) {
 
+        if(sound_start){
+            uint16_t SCC_out = 2100;
+            if(SCC_on){SCC_out = get_SCC_Out();}
+            sound_out = SCC_out + (get_AY_Out(1)<<3) - 2000;
+            sound_start = 0;
+        }
+
         if(start_read_joypad){ 
             // busy_wait_us(300);           
             convert_nes_to_MSX_joypad(read_joystick_data());
@@ -850,17 +861,10 @@ bool my_timer_callback(struct repeating_timer *t) {
         //         start_read_keyboard = true;
         //         start_read_joypad = true;           
 
-        if(start_print_regs){
-            start_print_regs = false;
-            printf ("page = %02X      Address = %04X  \n",reg_1, reg_2);
-            //     uint16_t start_address = 0xF0F1;
-            // for (size_t i = 0; i < 3; i++)
-            // {
-            //     printf ("page = %02X      Address = %04X  \n",start_address+i, page_ram[start_address+i]);
-            // }
-            
-
-        }
+        // if(start_print_regs){
+        //     start_print_regs = false;
+        //     printf ("page = %02X      Address = %04X  \n",reg_1, reg_2);
+        // }
     }//while
 }//main
 

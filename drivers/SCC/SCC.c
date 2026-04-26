@@ -9,7 +9,7 @@ typedef struct SCC_regs_t {
 	uint16_t SCC_freq[5];
     uint16_t SCC_counter[5];                       
 	uint8_t SCC_volume[5];
-    uint8_t SCC_channels_enable;
+    uint8_t SCC_channels_enable[5];
 } SCC_regs_t;
 
 static SCC_regs_t chip;
@@ -31,7 +31,8 @@ uint16_t get_SCC_Out(){
             inx_sample[i]++;          
         }
         j = (i < 4)? i : 3; // 3 и 4 из одной таблицы читаются
-        outSCC += SCC_ram[(0x20*(j)) + (inx_sample[i]&0x1F)] * chip.SCC_volume[i] * ((chip.SCC_channels_enable>>i) & 1);
+        // outSCC += SCC_ram[(0x20*(j)) + (inx_sample[i]&0x1F)] * chip.SCC_volume[i] * ((chip.SCC_channels_enable>>i) & 1);
+        outSCC += (chip.SCC_channels_enable[i])? (SCC_ram[(0x20*(j)) + (inx_sample[i]&0x1F)] * chip.SCC_volume[i]) : 0; 
     }
         outSCC = outSCC * 2;
         uint16_t out = ((uint16_t)(outSCC) + 0x8000)>>3;
@@ -99,7 +100,10 @@ void set_SCC_reg(uint16_t address, uint8_t reg ){
             break;
 // channels_enable
         case 0x0F:
-            chip.SCC_channels_enable = reg & 0x1F;
+            for (size_t i = 0; i < 5; i++)
+            {
+                chip.SCC_channels_enable[i] = (reg>>i) & 0x01;
+            }           
             break;                                                               
         default:
             break;
