@@ -7,9 +7,11 @@
 
 typedef struct SCC_regs_t {
 	uint16_t SCC_freq[5];
-    uint16_t SCC_counter[5];                       
+    uint16_t SCC_counter[5];
+    int16_t SCC_ch_out[5];                       
 	uint8_t SCC_volume[5];
     uint8_t SCC_channels_enable[5];
+    
 } SCC_regs_t;
 
 static SCC_regs_t chip;
@@ -28,11 +30,11 @@ uint16_t get_SCC_Out(){
     {
         if((chip.SCC_counter[i]++) >= (chip.SCC_freq[i]>>4)){
             chip.SCC_counter[i] = 0;
-            inx_sample[i]++;          
-        }
-        j = (i < 4)? i : 3; // 3 и 4 из одной таблицы читаются
-        // outSCC += SCC_ram[(0x20*(j)) + (inx_sample[i]&0x1F)] * chip.SCC_volume[i] * ((chip.SCC_channels_enable>>i) & 1);
-        outSCC += (chip.SCC_channels_enable[i])? (SCC_ram[(0x20*(j)) + (inx_sample[i]&0x1F)] * chip.SCC_volume[i]) : 0; 
+            inx_sample[i]++;
+            j = (i < 4)? i : 3; // 3 и 4 из одной таблицы читаются
+            chip.SCC_ch_out[i] = (chip.SCC_channels_enable[i])? (SCC_ram[(0x20*(j)) + (inx_sample[i]&0x1F)] * chip.SCC_volume[i]) : 0;         
+        }       
+        outSCC += chip.SCC_ch_out[i]; 
     }
         outSCC = outSCC * 2;
         uint16_t out = ((uint16_t)(outSCC) + 0x8000)>>3;
