@@ -2,6 +2,7 @@
 #include "stdbool.h"
 #include "string.h"
 #include "inttypes.h"
+#include "hardware/gpio.h"
 
 #define MAX_AMPLS 2 
 
@@ -103,7 +104,10 @@ void AY_reset() {
 void set_joy_val(uint8_t joy_in1,uint8_t joy_in2){
 	chip.joy_input[0] = joy_in1;
 	chip.joy_input[1] = joy_in2;
-
+}
+// tape in to A.7 PSG
+void tape_in_load(uint8_t val){
+	((chip.ay_R15 & 0x7f) | (val));
 }
 
 uint8_t AY_get_reg(){
@@ -190,7 +194,7 @@ void AY_set_reg(uint8_t val){
 		chip.ay_R14=val;
 		break;
 		case 15:
-		chip.ay_R15=val;
+		chip.ay_R15 = val;
 		break;
 		default:
 		break;

@@ -56,7 +56,7 @@
 #include "BIOS/A1Spirit.h"
 #include "BIOS/suitemsx.h"
 #include "BIOS/Gradius2.h"
-// #include "BIOS/SCCBOOT.h"
+// #include "BIOS/Valley2.h"
 
 #define UART_ID uart0
 #define BAUD_RATE 115200
@@ -87,6 +87,10 @@
 // /AUD_W
 #define AUD_W       41
 #define AUD_W_MASK (1ULL << AUD_W)
+
+// TAPE_IN
+#define TAPE_IN     46
+
 
 #define VDP_INT_PIO     pio0
 #define VDP_INT_SM      0
@@ -147,6 +151,9 @@ uint8_t cart_page1 = 1;
 uint8_t cart_page2 = 2;
 uint8_t cart_page3 = 3;
 uint8_t cart_page4 = 4;
+
+//TAPE_IN
+bool tape_in ;
 
 // PPI
 uint8_t portA_8255 = 0;                         // port 0xA8        primary slot register
@@ -271,7 +278,9 @@ void Z80_pin_setup() {
     // inInit(M1_PIN);
     
     inInit(PIN_NES_JOYPAD_DATA1);
-    inInit(PIN_NES_JOYPAD_DATA2);    
+    inInit(PIN_NES_JOYPAD_DATA2); 
+    
+    inInit(TAPE_IN);    
 
     // inInit(ENCODER_IN_A);
     // inInit(ENCODER_IN_B);
@@ -377,11 +386,9 @@ __always_inline static inline void read_MSX_io(const uint8_t portIO) {
             break;          
         case SSG:
             {
-                // gpio_put(AUD_W,0);                          // CS PSG
                 uint8_t temp = 0xFF;                
                 if(portIO == 0xA2){
                     temp = AY_get_reg();
-                    //  start_read_joypad = true;
                     }    
                 const uint32_t data = ((uint32_t)temp) << 22 ; 
                 gpio_put_masked(DATA_MASK,data);           
@@ -639,14 +646,9 @@ void print_key_state() {
 
 // Обработчик прерывания таймера
 bool alarm_callback(struct repeating_timer *t) {
-        // sound_start = true;
-
-        uint16_t SCC_out = 2100;
+        uint16_t SCC_out = 4100;
         if(SCC_on){SCC_out = get_SCC_Out();}
-        sample_to_send = SCC_out + (get_AY_Out(1)<<3) - 2000;
-
-        // sample_to_send = sound_out;
-
+        sample_to_send = SCC_out + (get_AY_Out(1)<<3) - 4000;
     return true; // Продолжаем повторение
 }
 
@@ -720,7 +722,8 @@ bool my_timer_callback(struct repeating_timer *t) {
 
     const uint PWM_PIN = AUD_W;
     const float SYS_CLK = 315000000.0f;
-    const float PWM_FREQ = 44100.0f;
+    // const float PWM_FREQ = 44100.0f;
+    const float PWM_FREQ = 88200.0f;
     // const uint SAMPLE_FREQ = 33000;
 
     // 1. Настройка PWM (44 кГц)
@@ -793,10 +796,10 @@ bool my_timer_callback(struct repeating_timer *t) {
     
     //ASCII/16kB
     // 128 kB 
-    for (size_t i = 0; i < Gradius2_rom_len/0x2000; i++)
-    {
-        memcpy(cart_rom[i], Gradius2_rom +i*0x2000,0x2000);
-    }
+    // for (size_t i = 0; i < Valley2_rom_len/0x2000; i++)
+    // {
+    //     memcpy(cart_rom[i], Valley2_rom +i*0x2000,0x2000);
+    // }
    
 
 // sleep_ms(2000);
@@ -810,12 +813,10 @@ bool my_timer_callback(struct repeating_timer *t) {
 
     while (true) {
 
-        // if(sound_start){
-        //     uint16_t SCC_out = 2100;
-        //     if(SCC_on){SCC_out = get_SCC_Out();}
-        //     sound_out = SCC_out + (get_AY_Out(1)<<3) - 2000;
-        //     sound_start = 0;
-        // }
+        if(tape_in != gpio_get(TAPE_IN)){
+                tape_in = gpio_get(TAPE_IN);
+                tape_in_load (tape_in << 7);
+        }
 
         if(start_read_joypad){ 
             // busy_wait_us(300);           
