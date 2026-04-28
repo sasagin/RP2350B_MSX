@@ -20,8 +20,8 @@
 #define MSXkey_RIGHT_BR  	~(1<<6)
 #define MSXkey_SEMICOLON 	~(1<<7)
 // Y2
-#define MSXkey_TILDE   		~(1<<0)
-#define MSXkey_QUOTE		~(1<<1)
+#define MSXkey_QUOTE		~(1<<0)
+#define MSXkey_TILDE   		~(1<<1)
 #define MSXkey_PERIOD		~(1<<2)
 #define MSXkey_COMMA   		~(1<<3)
 #define MSXkey_SLASH		~(1<<4)

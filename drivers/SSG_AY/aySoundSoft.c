@@ -107,7 +107,7 @@ void set_joy_val(uint8_t joy_in1,uint8_t joy_in2){
 }
 // tape in to A.7 PSG
 void tape_in_load(uint8_t val){
-	((chip.ay_R15 & 0x7f) | (val));
+	chip.ay_R14 = ((chip.ay_R14 & 0x7f) | (val));
 }
 
 uint8_t AY_get_reg(){
@@ -134,8 +134,11 @@ uint8_t AY_get_reg(){
 				j0 = (chip.ay_R15 & 0x10)? 0xFF:j0;
 				j0 = (j0 & ((chip.ay_R15<<4) | 0xCF));
 				j1 = (chip.ay_R15 & 0x20)? 0xFF:j1;
-				j1 = (j1 & ((chip.ay_R15<<2) | 0xCF));				
-		 		return chip.ay_R14 = (chip.ay_R15 & 0x40)?j1:j0;
+				j1 = (j1 & ((chip.ay_R15<<2) | 0xCF));
+
+				chip.ay_R14 = chip.ay_R14 & 0x80;		//save bit tape_in
+
+		 		return chip.ay_R14 |= ((chip.ay_R15 & 0x40)?j1:j0) & 0x7F;
 				// return 0xff;
 
 		case 15: return chip.ay_R15;

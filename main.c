@@ -56,7 +56,7 @@
 #include "BIOS/A1Spirit.h"
 #include "BIOS/suitemsx.h"
 #include "BIOS/Gradius2.h"
-// #include "BIOS/Valley2.h"
+#include "BIOS/Valley2.h"
 
 #define UART_ID uart0
 #define BAUD_RATE 115200
@@ -90,6 +90,7 @@
 
 // TAPE_IN
 #define TAPE_IN     46
+#define TAPE_OUT    47
 
 
 #define VDP_INT_PIO     pio0
@@ -281,7 +282,7 @@ void Z80_pin_setup() {
     inInit(PIN_NES_JOYPAD_DATA2); 
     
     inInit(TAPE_IN);    
-
+    outInit(TAPE_OUT,0);
     // inInit(ENCODER_IN_A);
     // inInit(ENCODER_IN_B);
 
@@ -319,9 +320,13 @@ __always_inline static inline void write8255(const uint8_t reg, const uint8_t va
                         break;
                     case 2:   
                         portC_8255 = value;
+
+reg_1 = value;
+start_print_regs = true;     
+
                         break;
                     case 3:              
-                        mode_8255 = value; 
+                        mode_8255 = value;                       
                         break;   
                     default:
                         break;
@@ -550,10 +555,7 @@ __always_inline static inline void write_MSX_memory(const uint16_t address,const
                 {
                  switch (pri_slot_reg[2])                      
                         {
-                        case SLOT2:
-                            reg_2 = address;
-                            reg_1 = value;
-                            // start_print_regs = true;                        
+                        case SLOT2:                      
                             if(address == 0x9000) {
                                 if(value >= 0x20){SCC_on = 1;}else{cart_page2 = value & 0x0F;}                               
                             }
@@ -796,13 +798,14 @@ bool my_timer_callback(struct repeating_timer *t) {
     
     //ASCII/16kB
     // 128 kB 
-    // for (size_t i = 0; i < Valley2_rom_len/0x2000; i++)
-    // {
-    //     memcpy(cart_rom[i], Valley2_rom +i*0x2000,0x2000);
-    // }
+    for (size_t i = 0; i < Valley2_rom_len/0x2000; i++)
+    {
+        memcpy(cart_rom[i], Valley2_rom +i*0x2000,0x2000);
+    }
    
 
 // sleep_ms(2000);
+printf ("start\n ");
 
     multicore_launch_core1(Z80_loop);
 
@@ -815,8 +818,18 @@ bool my_timer_callback(struct repeating_timer *t) {
 
         if(tape_in != gpio_get(TAPE_IN)){
                 tape_in = gpio_get(TAPE_IN);
-                tape_in_load (tape_in << 7);
+                uint8_t bit_in = 0;
+                bit_in |= tape_in;
+                bit_in <<= 7;
+                tape_in_load (bit_in);
         }
+// out 
+        if (start_print_regs){
+            gpio_put(TAPE_OUT,(reg_1 >> 7 )&1);                
+            printf ("tape in %02x \n",reg_1);
+            start_print_regs = false;
+        }
+
 
         if(start_read_joypad){ 
             // busy_wait_us(300);           
