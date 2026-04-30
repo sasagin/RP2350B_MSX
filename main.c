@@ -26,7 +26,7 @@
 #include "BIOS/pico9918_asc16.h"
 #include "BIOS/pico9918_konami.h"
 // #include "BIOS/cbios.h"
-// #include "BIOS/cbios_msx1.h"
+// #include "BIOS/Philips.h"
 #include "BIOS/msx.h"
 #include "BIOS/yamaha_msx1_diag.h"
 #include "BIOS/Yazzie.h"
@@ -154,7 +154,6 @@ uint8_t cart_page3 = 3;
 uint8_t cart_page4 = 4;
 
 //TAPE_IN
-bool tape_in ;
 
 // PPI
 uint8_t portA_8255 = 0;                         // port 0xA8        primary slot register
@@ -287,7 +286,8 @@ void Z80_pin_setup() {
     // inInit(ENCODER_IN_B);
 
     outInit(RESET_PIN,0);
-    outInit(WAIT_PIN, 1);
+    outInit(WAIT_PIN, 1);           //для MSX отключить у него свой формирователь
+
     outInit(NMI_PIN, 1);
     // outInit(INT_PIN, 1);
     outInit(VDP_RD,1);
@@ -297,9 +297,11 @@ void Z80_pin_setup() {
     outInit(PIN_NES_JOYPAD_LATCH,1);
 }
 
-void VDP_INT_init() {
     PIO piopio = VDP_INT_PIO;
     uint smsm  = VDP_INT_SM;
+void VDP_INT_init() {
+    // PIO piopio = VDP_INT_PIO;
+    // uint smsm  = VDP_INT_SM;
     pio_set_gpio_base(piopio, 16);
     const uint pio_offset = pio_add_program(piopio, &vdpintz80_program);
     vdpintz80_program_init(piopio, smsm, pio_offset);
@@ -320,13 +322,22 @@ __always_inline static inline void write8255(const uint8_t reg, const uint8_t va
                         break;
                     case 2:   
                         portC_8255 = value;
-
-reg_1 = value;
-start_print_regs = true;     
-
                         break;
                     case 3:              
-                        mode_8255 = value;                       
+                        if (value & 0x80) {
+                            mode_8255 = value; // Установка режима (например, 0x82)
+                        } else {
+        // Режим Bit Set/Reset для Port C
+                        uint8_t bit_to_set = (value >> 1) & 0x07; // какой бит менять (0-7)
+                        uint8_t set_high = value & 0x01;          // 1 = set, 0 = reset 
+                            if(bit_to_set == 5){gpio_put(TAPE_OUT,set_high);}      
+                            if (set_high) {
+                                portC_8255 |= (1 << bit_to_set);
+                            } else {
+                                portC_8255 &= ~(1 << bit_to_set);
+                            }
+start_print_regs = true;
+                        }                     
                         break;   
                     default:
                         break;
@@ -393,6 +404,8 @@ __always_inline static inline void read_MSX_io(const uint8_t portIO) {
             {
                 uint8_t temp = 0xFF;                
                 if(portIO == 0xA2){
+// tape in
+                    tape_in_load (gpio_get(TAPE_IN)? 0x80 : 0x00);                                      
                     temp = AY_get_reg();
                     }    
                 const uint32_t data = ((uint32_t)temp) << 22 ; 
@@ -765,7 +778,8 @@ bool my_timer_callback(struct repeating_timer *t) {
     ); 
     
     // Load BIOS
-    memcpy(bios_rom, msx_rom, msx_rom_len); 
+    memcpy(bios_rom, msx_rom, msx_rom_len);
+    // memcpy(bios_rom, Philips_rom, Philips_rom_len); 
     // memcpy(bios_rom, cbios_rom, cbios_rom_len);
     
     // Load program
@@ -798,10 +812,10 @@ bool my_timer_callback(struct repeating_timer *t) {
     
     //ASCII/16kB
     // 128 kB 
-    for (size_t i = 0; i < Valley2_rom_len/0x2000; i++)
-    {
-        memcpy(cart_rom[i], Valley2_rom +i*0x2000,0x2000);
-    }
+    // for (size_t i = 0; i < Valley2_rom_len/0x2000; i++)
+    // {
+    //     memcpy(cart_rom[i], Valley2_rom +i*0x2000,0x2000);
+    // }
    
 
 // sleep_ms(2000);
@@ -815,22 +829,6 @@ printf ("start\n ");
     AY_reset();    
 
     while (true) {
-
-        if(tape_in != gpio_get(TAPE_IN)){
-                tape_in = gpio_get(TAPE_IN);
-                uint8_t bit_in = 0;
-                bit_in |= tape_in;
-                bit_in <<= 7;
-                tape_in_load (bit_in);
-        }
-// out 
-        if (start_print_regs){
-            gpio_put(TAPE_OUT,(reg_1 >> 7 )&1);                
-            printf ("tape in %02x \n",reg_1);
-            start_print_regs = false;
-        }
-
-
         if(start_read_joypad){ 
             // busy_wait_us(300);           
             convert_nes_to_MSX_joypad(read_joystick_data());
