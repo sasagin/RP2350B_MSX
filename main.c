@@ -286,7 +286,7 @@ void Z80_pin_setup() {
     // inInit(ENCODER_IN_B);
 
     outInit(RESET_PIN,0);
-    outInit(WAIT_PIN, 1);           //для MSX отключить у него свой формирователь
+    // outInit(WAIT_PIN, 1);           //для MSX отключить у него свой формирователь
 
     outInit(NMI_PIN, 1);
     // outInit(INT_PIN, 1);
