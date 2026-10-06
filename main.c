@@ -12,6 +12,9 @@
 #include <hardware/structs/qmi.h>
 #include <hardware/structs/xip.h>
 
+#include "ff.h"
+#include "f_util.h"
+
 #include "drivers/SSG_AY/aySoundSoft.h"
 #include "drivers/SCC/SCC.h"
 
@@ -23,74 +26,41 @@
 #include "Z80pinout.h"
 #include "VDP_int_Z80.pio.h"
 
-#include "BIOS/pico9918_asc16.h"
-#include "BIOS/pico9918_konami.h"
-// #include "BIOS/cbios.h"
-// #include "BIOS/Philips.h"
-#include "BIOS/msx.h"
-#include "BIOS/yamaha_msx1_diag.h"
-#include "BIOS/Yazzie.h"
-#include "BIOS/MSXDiag.h"
-// #include "BIOS/y503bios.h"
-#include "BIOS/Psych.h"
-#include "BIOS/Rock.h"
-#include "BIOS/BombMan.h"
-#include "BIOS/BattleShip.h"
-#include "BIOS/BoulderDash.h"
-#include "BIOS/Oil.h"
-#include "BIOS/Choplifter.h"
-#include "BIOS/Castle.h"
-#include "BIOS/Flappy.h"
-#include "BIOS/Saimazoom.h"
-#include "BIOS/PSG.h"
-#include "BIOS/Syntesizer.h"
-#include "BIOS/Formula.h"
-#include "BIOS/Nemesis.h"
-#include "BIOS/Arkanoid.h"
-#include "BIOS/BlockHole.h"
-#include "BIOS/Skooter.h"
-#include "BIOS/GrandPrixRider.h"
-#include "BIOS/Soukoban.h"
-#include "BIOS/Thexder.h"
-#include "BIOS/RoadFighter.h"
-#include "BIOS/A1Spirit.h"
-#include "BIOS/suitemsx.h"
-#include "BIOS/Gradius2.h"
-#include "BIOS/Valley2.h"
 
-#define UART_ID uart0
-#define BAUD_RATE 115200
-#define UART_TX_PIN 0
-#define UART_RX_PIN 1
+// #define UART_ID uart0
+// #define BAUD_RATE 115200
+// #define UART_TX_PIN 32
+// #define UART_RX_PIN 33
+
 #define QNT_KEYS    128
 
 // NES-compatible gamepad (shift register) pins
-#define PIN_NES_JOYPAD_CLOCK 42
-#define PIN_NES_JOYPAD_LATCH 43
-#define PIN_NES_JOYPAD_DATA1  44
-#define PIN_NES_JOYPAD_DATA2  45
+#define PIN_NES_JOYPAD_CLOCK 32
+#define PIN_NES_JOYPAD_LATCH 33
+#define PIN_NES_JOYPAD_DATA1  34
+#define PIN_NES_JOYPAD_DATA2  35
 #define NES_JOYPAD_SHIFT_COUNT 8
 
 
 //RESET
-#define RESET_PIN      34
+#define RESET_PIN      44
 #define RESET_MASK (1ULL << RESET_PIN)
 
 // /VDP_RD 
-#define VDP_RD      38
+#define VDP_RD      36
 #define VDP_RD_MASK (1ULL << VDP_RD)
 
 // /VDP_WR 
-#define VDP_WR      39
+#define VDP_WR      37
 #define VDP_WR_MASK (1ULL << VDP_WR)
 
 // /AUD_W
-#define AUD_W       41
+#define AUD_W       39
 #define AUD_W_MASK (1ULL << AUD_W)
 
 // TAPE_IN
-#define TAPE_IN     46
-#define TAPE_OUT    47
+#define TAPE_IN     45
+#define TAPE_OUT    46
 
 
 #define VDP_INT_PIO     pio0
@@ -160,17 +130,6 @@ uint8_t portA_8255 = 0;                         // port 0xA8        primary slot
 uint8_t portB_8255 = 0;                         // port 0xA9        input from polling keyboard
 uint8_t portC_8255 = 0;                         // port 0xAA        output polling keyboard and other needs
 uint8_t mode_8255;                              // port 0xAB        mode 8255
-
-//regs for tests
-volatile bool start_print_regs = true;
-volatile uint8_t reg_1 = 0x00; //
-volatile uint16_t reg_2 = 0x00; //
-// volatile uint16_t reg_3 = 0x00; //
-// volatile uint16_t reg_4 = 0x00; //
-// volatile uint8_t reg_5 = 0x00; //
-// volatile uint8_t reg_6 = 0x00; //
-// volatile uint8_t reg_7 = 0x00; //
-// volatile uint8_t reg_8 = 0x00; //
 
 // keyboard
 uint8_t keymapMSX[11] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
@@ -293,6 +252,7 @@ void Z80_pin_setup() {
     outInit(VDP_RD,1);
     outInit(VDP_WR,1);
     // outInit(AUD_W,1);
+
     outInit(PIN_NES_JOYPAD_CLOCK,1);
     outInit(PIN_NES_JOYPAD_LATCH,1);
 }
@@ -336,7 +296,7 @@ __always_inline static inline void write8255(const uint8_t reg, const uint8_t va
                             } else {
                                 portC_8255 &= ~(1 << bit_to_set);
                             }
-start_print_regs = true;
+// start_print_regs = true;
                         }                     
                         break;   
                     default:
@@ -408,7 +368,7 @@ __always_inline static inline void read_MSX_io(const uint8_t portIO) {
                     tape_in_load (gpio_get(TAPE_IN)? 0x80 : 0x00);                                      
                     temp = AY_get_reg();
                     }    
-                const uint32_t data = ((uint32_t)temp) << 22 ; 
+                const uint32_t data = ((uint32_t)temp) << 16 ; 
                 gpio_put_masked(DATA_MASK,data);           
                 gpio_set_dir_out_masked(DATA_MASK);                
             }        
@@ -417,7 +377,7 @@ __always_inline static inline void read_MSX_io(const uint8_t portIO) {
             {
                 uint8_t temp = 0xFF;
                 temp = read8255(portIO);
-                const uint32_t data = ((uint32_t)temp) << 22 ; 
+                const uint32_t data = ((uint32_t)temp) << 16 ; 
                 gpio_put_masked(DATA_MASK,data);           
                 gpio_set_dir_out_masked(DATA_MASK);                
             }
@@ -425,7 +385,7 @@ __always_inline static inline void read_MSX_io(const uint8_t portIO) {
         default:
             {
                 uint8_t temp = 0xFF;                
-                const uint32_t data = ((uint32_t)temp) << 22 ; 
+                const uint32_t data = ((uint32_t)temp) << 16 ; 
                 gpio_put_masked(DATA_MASK,data);           
                 gpio_set_dir_out_masked(DATA_MASK);                
             }
@@ -612,9 +572,9 @@ void __time_critical_func(Z80_loop)() {
         //------------memory ok-----------------
 
         while(!(gpio_get_all64() & MREQ_MASK)) {                                    // memory read write
-                uint16_t address = (uint16_t)((gpio_get_all() >> 6) & 0x0000ffff);  
+                uint16_t address = (uint16_t)((gpio_get_all()) & 0x0000ffff);  
                 while(!(gpio_get_all() & READ_MASK)) {                                  //  read from         
-                    const uint32_t data = read_MSX_memory(address) << 22;
+                    const uint32_t data = read_MSX_memory(address) << 16;
                     gpio_put_masked(DATA_MASK,data);
                     gpio_set_dir_out_masked(DATA_MASK);
                 }
@@ -623,14 +583,14 @@ void __time_critical_func(Z80_loop)() {
                             
                 while(!(gpio_get_all() & WRITE_MASK)) {                                 // write to ram                            
                         // : MSX RAM
-                    uint8_t data_to_ram = (uint8_t)((gpio_get_all() >>22) & 0x000000FF);
+                    uint8_t data_to_ram = (uint8_t)((gpio_get_all() >> 16) & 0x000000FF);
                     write_MSX_memory(address,data_to_ram);                 
                 }         
         }
     
     // io port
         while(!(gpio_get_all64() & IORQ_MASK)) {
-            uint16_t address = (gpio_get_all() >> 6) ;              // mask io port address
+            uint16_t address = (gpio_get_all()) ;              // mask io port address
             uint8_t portIO = (uint8_t)(0x00FF & address);
 
     // read from IO             
@@ -640,7 +600,7 @@ void __time_critical_func(Z80_loop)() {
     // write to IO        
             while(!(gpio_get_all64() & WRITE_MASK)) {                              // write to IO
 
-                uint8_t datawritetoio = (uint8_t)((gpio_get_all() >>22)&0x000000ff);
+                uint8_t datawritetoio = (uint8_t)((gpio_get_all() >> 16)&0x000000ff);
                 write_MSX_io(portIO,datawritetoio);
                 }
             gpio_set_dir_in_masked(DATA_MASK);
@@ -690,14 +650,14 @@ bool my_timer_callback(struct repeating_timer *t) {
     // if (!set_sys_clock_hz(CPU_FREQ_MHZ * MHZ, 0) ) {
         set_sys_clock_hz(315 * MHZ, 1); // fallback to failsafe clocks
     // }
+
+        // Инициализируем UART    
+    // uart_init(UART_ID, BAUD_RATE);
+
+    // // Настраиваем GPIO пины для UART
+    // gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+    // gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
            
-    // Инициализируем UART    
-    uart_init(UART_ID, BAUD_RATE);
-
-    // Настраиваем GPIO пины для UART
-    gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
-    gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
-
     stdio_init_all();
 
     // Инициализация USB стека
@@ -776,50 +736,57 @@ bool my_timer_callback(struct repeating_timer *t) {
         0xFFFFFFFF,        // Сколько раз (бесконечно в режиме зацикливания)
         true               // Старт
     ); 
-    
-    // Load BIOS
-    memcpy(bios_rom, msx_rom, msx_rom_len);
-    // memcpy(bios_rom, Philips_rom, Philips_rom_len); 
-    // memcpy(bios_rom, cbios_rom, cbios_rom_len);
-    
-    // Load program
-    // 16 kb
-    // memcpy(cart_rom[0], yamaha_msx1_diag_rom, yamaha_msx1_diag_rom_len);
-    // memcpy(cart_rom[0], Oil_rom, Oil_rom_len);
-    // memcpy(cart_rom[0], Flappy_rom, Flappy_rom_len);
-    // memcpy(cart_rom[0], PSG_rom, PSG_rom_len);
-    // memcpy(cart_rom[1], Psych_rom, Psych_rom_len);
-    // memcpy(cart_rom[1], BombMan_rom, BombMan_rom_len);
-    // memcpy(cart_rom[1], Rock_rom, Rock_rom_len);
-    // memcpy(cart_rom[1], BattleShip_rom, BattleShip_rom_len);
-    // memcpy(cart_rom[1], Viking_rom, Viking_rom_len);
-    // 32 kb
-    //   memcpy(cart_rom[0], Castle_rom, 0x4000);
-    //   memcpy(cart_rom[1], Castle_rom + 0x4000, 0x4000); 
-    //   memcpy(cart_rom[0], Yazzie_rom, 0x4000);
-    //   memcpy(cart_rom[1], Yazzie_rom + 0x4000, 0x4000);    
-    //   memcpy(cart_rom[0], BoulderDash_rom, 0x4000);
-    //   memcpy(cart_rom[1], BoulderDash_rom + 0x4000, 0x4000); 
-    //   memcpy(cart_rom[cart_page0], MSXDiag_rom, 0x4000);
-    //   memcpy(cart_rom[cart_page1], MSXDiag_rom + 0x4000, 0x4000);
-    //   memcpy(cart_rom[0], Choplifter_rom, 0x4000);
-    //   memcpy(cart_rom[1], Choplifter_rom + 0x4000, 0x4000);
-    //   memcpy(cart_rom[0], Saimazoom_rom, 0x4000);
-    //   memcpy(cart_rom[1], Saimazoom_rom + 0x4000, 0x4000);
-    //   memcpy(cart_rom[0], Synthesizer_rom, 0x4000);
-    //   memcpy(cart_rom[1], Synthesizer_rom + 0x4000, 0x4000);
 
+    FATFS fs;
+    FIL file_sd;
+    UINT br;
+    FRESULT res;      
+ 
+        // Mount SD card filesystem
+    if (FR_OK != f_mount(&fs, "", 1)) {
+        // while (!stdio_usb_connected()) { tight_loop_contents(); }
+        printf("SD Card not inserted or SD Card error!");
+        // reset_usb_boot(0, 0);
+    }
     
-    //ASCII/16kB
-    // 128 kB 
-    // for (size_t i = 0; i < Valley2_rom_len/0x2000; i++)
-    // {
-    //     memcpy(cart_rom[i], Valley2_rom +i*0x2000,0x2000);
-    // }
+        // Load BIOS
+    res = f_open(&file_sd, "/MSX/BIOS/main.rom", FA_READ);
+    if (res != FR_OK) {
+        printf("Cannot open BIOS!\n");
+        // reset_usb_boot(0, 0);
+    }
+
+    res = f_read(&file_sd, bios_rom, 0x8000, &br);
+    f_close(&file_sd);
+
+    if (res != FR_OK || br == 0) {
+        printf("BIOS read error!\n");
+        // reset_usb_boot(0, 0);
+    }
+    printf("BIOS loaded: %u bytes\n", br);
    
+    // Load program
 
-// sleep_ms(2000);
-printf ("start\n ");
+    res = f_open(&file_sd, "/MSX/CART/game.rom", FA_READ);
+    if (res != FR_OK) {
+        printf("Cannot open cartridge!\n");
+        // return;
+    }
+
+    size_t cart_size = 0;
+    for (int i = 0; i < 16; i++) {
+        res = f_read(&file_sd, cart_rom[i], 0x2000, &br);
+        if (res != FR_OK || br == 0) break;
+        cart_size += br;
+        if (br < 0x2000) break;  // файл кончился
+    }
+    f_close(&file_sd);
+
+    printf("Cartridge loaded: %u bytes, %u pages\n",
+        cart_size, (cart_size + 0x1FFF) / 0x2000);
+          
+    // sleep_ms(2000);
+    printf ("start\n ");
 
     multicore_launch_core1(Z80_loop);
 

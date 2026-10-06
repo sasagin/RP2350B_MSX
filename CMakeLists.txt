@@ -16,7 +16,7 @@ else()
     set(USERHOME $ENV{HOME})
 endif()
 set(sdkVersion 2.2.0)
-set(toolchainVersion 14_3_Rel1)
+set(toolchainVersion 14_2_Rel1)
 set(picotoolVersion 2.2.0-a4)
 set(picoVscode ${USERHOME}/.pico-sdk/cmake/pico-vscode.cmake)
 if (EXISTS ${picoVscode})
@@ -46,12 +46,14 @@ add_executable(${PROJECT_NAME} main.c)
 pico_set_program_name(RP2350_MSX "RP2350Tester")
 pico_set_program_version(RP2350_MSX "0.1")
 
-add_subdirectory(drivers/SCC)
 add_subdirectory(drivers/SSG_AY)
+add_subdirectory(drivers/SCC)
+
+add_subdirectory(drivers/sdcard)
+add_subdirectory(drivers/fatfs)
 
 # Add the standard library to the build
 target_link_libraries(${PROJECT_NAME} PRIVATE
-            
             pico_stdlib
             tinyusb_host
             tinyusb_device         
@@ -67,26 +69,34 @@ pico_generate_pio_header(${PROJECT_NAME}
 # Включаем поддержку USB Host в настройках
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     CFG_TUSB_RHPORT0_MODE=OPT_MODE_HOST
+
+        SDCARD_PIN_SPI0_MISO=40
+        SDCARD_PIN_SPI0_CS=41
+        SDCARD_PIN_SPI0_SCK=42
+        SDCARD_PIN_SPI0_MOSI=43
+
 )
 # Add the standard include files to the build
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
 )  
 
-
 # Add any user requested libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE
 
-        aySoundSoft 
-        
+        aySoundSoft
         SCC
 
+        sdcard
+        fatfs        
+     
         pico_runtime
-        hardware_dma       
+        pico_stdlib
         hardware_vreg
         hardware_clocks
         hardware_pwm
         hardware_pio
+        hardware_dma
         # hardware_i2c
         pico_multicore
         hardware_interp hardware_timer hardware_flash
